@@ -1,0 +1,3 @@
+[submodule "matlab-tanner-graphs"]
+	path = lib/matlab-tanner-graphs
+	url = https://github.com/rtajan/matlab-tanner-graphs.git
