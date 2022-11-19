@@ -3,15 +3,21 @@ clc
 
 %% Parametres
 % -------------------------------------------------------------------------
+addpath('src')
+addpath('lib')
+addpath('alist')
+[H] = alist2sparse('alist/DEBUG_6_3.alist');
+[h, g] = ldpc_h2g(H);
 
 
- [H] = alist2sparse("alist\DEBUG_6_3.alist");
+h=full(h);
+
 
 
 addpath('src')
 simulation_name = 'non_codee';
 
-R = 1; % Rendement de la communication
+R = 0.5; % Rendement de la communication
 
 pqt_par_trame = 1; % Nombre de paquets par trame
 bit_par_pqt   = 330;% Nombre de bits par paquet
@@ -86,37 +92,49 @@ fprintf(      '|------------|---------------|------------|----------|-----------
 for i_snr = 1:length(EbN0dB)
     reverseStr = ''; % Pour affichage en console
     awgn_channel.EsNo = EsN0dB(i_snr);% Mise a jour du EbN0 pour le canal
-    
+
     stat_erreur.reset; % reset du compteur d'erreur
     err_stat    = [0 0 0]; % vecteur résultat de stat_erreur
-    
+
     demod_psk.Variance = awgn_channel.Variance;
-    
+
     n_frame = 0;
     T_rx = 0;
     T_tx = 0;
     general_tic = tic;
     while (err_stat(2) < nbr_erreur && err_stat(3) < nbr_bit_max)
         n_frame = n_frame + 1;
-        
+
         %% Emetteur
         tx_tic = tic;                 % Mesure du débit d'encodage
-        b    = randi([0,1],K/size(g,1),size(g,1));    % Génération du message aléatoire
-        b=b*g;
-        x      = step(mod_psk,  b); % Modulation BPSK
+        tx_tic = tic;   % Mesure du débit d'encodage
+
+        K=size(h,1);
+        % b=[0 0 0];
+        b      = randi([0,1],K,1);    % Génération du message aléatoire
+        % construction du mot de code
+        b2 = reshape(b,fix(K/K),K);
+        code = b2*g;
+        [h_c,w_c] = size(code);
+        %code2 = reshape(code, 1,h_c*w_c);
+        code2=mod(code,2);
+
+        x      = step(mod_psk,  code2'); % Modulation BPSK
         T_tx   = T_tx+toc(tx_tic);    % Mesure du débit d'encodage
-        
+
         %% Canal
         y     = step(awgn_channel,x); % Ajout d'un bruit gaussien
-        
+
         %% Recepteur
         rx_tic = tic;                  % Mesure du débit de décodage
         Lc      = step(demod_psk,y);   % Démodulation (retourne des LLRs)
-        rec_b = double(Lc(1:K) < 0); % Décision
+        [rec_b,c2v,v2c]=decodeLDPC(3,Lc,h);
+        rec_b=rec_b(fix(size(h,2)/2)+1:end);
+        %rec_b = double(Lc(1:K) < 0); % Décision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du débit de décodage
-        
-        err_stat   = step(stat_erreur, b, rec_b); % Comptage des erreurs binaires
-        
+
+        err_stat   = step(stat_erreur, b, rec_b'); % Comptage des erreurs binaires
+
         %% Affichage du résultat
         if mod(n_frame,100) == 1
             msg = sprintf(msg_format,...
@@ -131,9 +149,9 @@ for i_snr = 1:length(EbN0dB)
             msg_sz =  fprintf(msg);
             reverseStr = repmat(sprintf('\b'), 1, msg_sz);
         end
-        
+
     end
-    
+
     msg = sprintf(msg_format,...
         EbN0dB(i_snr),         ... % EbN0 en dB
         err_stat(3),           ... % Nombre de bits envoyés
@@ -145,15 +163,15 @@ for i_snr = 1:length(EbN0dB)
     fprintf(reverseStr);
     msg_sz =  fprintf(msg);
     reverseStr = repmat(sprintf('\b'), 1, msg_sz);
-    
+
     ber(i_snr) = err_stat(1);
     refreshdata(h_ber);
     drawnow limitrate
-    
+
     if err_stat(1) < ber_min
         break
     end
-    
+
 end
 fprintf('|------------|---------------|------------|----------|----------------|-----------------|--------------|\n')
 

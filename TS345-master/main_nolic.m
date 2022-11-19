@@ -6,12 +6,14 @@ clc
 % g encode, h decode. 1 itération = quand l'ensemble des noeuds de parité
 % et de variables ont fait un aller retour. 
 
+%%
 addpath('src')
 addpath('lib')
 addpath('alist')
 [H] = alist2sparse('alist/DEBUG_6_3.alist');
 [h, g] = ldpc_h2g(H);
 
+%%
 h=full(h);
 
 
