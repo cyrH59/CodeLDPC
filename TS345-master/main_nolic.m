@@ -11,10 +11,17 @@ addpath('src')
 addpath('lib')
 addpath('alist')
 [H] = alist2sparse('alist/DEBUG_6_3.alist');
+
+
+
 [h, g] = ldpc_h2g(H);
 
+
 %%
-h=full(h);
+% h=full(h);
+[k,n]=size(g);
+ 
+ldpcencoder = comm.LDPCEncoder(h);
 
 
 simulation_name = 'non_codee';
@@ -22,7 +29,7 @@ simulation_name = 'non_codee';
 R = 0.5; % Rendement de la communication
 
 pqt_par_trame = 1; % Nombre de paquets par trame
-bit_par_pqt   = 330;% Nombre de bits par paquet
+bit_par_pqt   = k;% Nombre de bits par paquet
 K = pqt_par_trame*bit_par_pqt; % Nombre de bits de message par trame
 N = K/R; % Nombre de bits codés par trame (codée)
 
@@ -30,11 +37,11 @@ M = 2; % Modulation BPSK <=> 2 symboles
 phi0 = 0; % Offset de phase our la BPSK
 
 EbN0dB_min  = -2; % Minimum de EbN0
-EbN0dB_max  = 10; % Maximum de EbN0
-EbN0dB_step = 0.5;% Pas de EbN0
+EbN0dB_max  = 6; % Maximum de EbN0
+EbN0dB_step = 1;% Pas de EbN0
 
 nbr_erreur  = 100;  % Nombre d'erreurs à observer avant de calculer un BER
-nbr_bit_max = 100e6;% Nombre de bits max à simuler
+nbr_bit_max = 1e6;% Nombre de bits max à simuler
 ber_min     = 1e-6; % BER min
 
 EbN0dB = EbN0dB_min:EbN0dB_step:EbN0dB_max;     % Points de EbN0 en dB à simuler
@@ -81,17 +88,20 @@ for i_snr = 1:length(EbN0dB)
         
         %% Emetteur
         tx_tic = tic;   % Mesure du débit d'encodage
-        K=size(h,1);
+       % K=size(h,1);
        % b=[0 0 0];
         b      = randi([0,1],K,1);    % Génération du message aléatoire
        % construction du mot de code
-        b2 = reshape(b,fix(K/K),K);
-        code = b2*g;
-        [h_c,w_c] = size(code);
-        code2 = reshape(code, 1,h_c*w_c);
-        code2=mod(code,2);
+%         b2 = reshape(b,fix(K/K),K);
+%         code = b2*g;
+%         [h_c,w_c] = size(code);
+%         code2 = reshape(code, 1,h_c*w_c);
+%         code2=mod(code,2);
+%         code2 = ldpcEncode(b,encodercfg);
+%          b_code = mod(reshape(b,k,K/k)'*g, 2);
+        b_code=step(ldpcencoder,b);
 
-        x      = 1 - 2*code2; % Modulation BPSK
+        x      = 1 - 2*b_code; % Modulation BPSK
 
         %x      = 1 - 2*b; % Modulation BPSK
         T_tx   = T_tx+toc(tx_tic);    % Mesure du débit d'encodage
@@ -103,8 +113,9 @@ for i_snr = 1:length(EbN0dB)
         %% Recepteur
         rx_tic = tic;                  % Mesure du débit de décodage
         Lc      = 2*y/sigma2;   % Démodulation (retourne des LLRs)
-        [rec_b,c2v,v2c]=decodeLDPC(1,Lc,h);
-        rec_b=rec_b(fix(size(h,2)/2)+1:end);
+        [rec_b,c2v,v2c]=decodeLDPC(5,Lc,h);
+        rec_b=rec_b(1:fix(size(h,2)/2));
+        %rec_b=rec_b(fix(size(h,2)/2)+1:end);
         %rec_b = double(Lc(1:K) < 0); % Décision
         T_rx    = T_rx + toc(rx_tic);  % Mesure du débit de décodage
         
